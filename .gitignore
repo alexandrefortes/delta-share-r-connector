@@ -1,0 +1,12 @@
+# Credenciais do Delta Sharing - NUNCA versionar (contem o token)
+config.share
+
+# Dados baixados
+dados/
+
+# Arquivos temporarios do R / RStudio
+.Rhistory
+.RData
+.Rproj.user/
+*.Rproj
+.Ruserdata

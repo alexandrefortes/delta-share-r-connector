@@ -1,0 +1,1 @@
+{"shareCredentialsVersion":1,"bearerToken":"COLOQUE_AQUI_O_SEU_TOKEN","endpoint":"https://SEU-WORKSPACE.cloud.databricks.com/api/2.0/delta-sharing/metastores/XXXX","expirationTime":"9999-12-31T23:59:59.999Z","icebergEndpoint":"https://SEU-WORKSPACE.cloud.databricks.com/api/2.1/unity-catalog/iceberg"}
