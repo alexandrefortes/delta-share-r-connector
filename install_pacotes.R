@@ -1,71 +1,90 @@
 # =====================================================================
-#  INSTALACAO DOS PACOTES  ->  RODAR UMA VEZ SO
+#  INSTALACAO DAS DEPENDENCIAS  ->  RODAR UMA VEZ SO
 # =====================================================================
-#  Conector Delta Sharing (Databricks Open Share) para R / RStudio.
+#  Conector Delta Sharing (Databricks Open Share).
 #
-#  Como usar:
-#    1. Abra este arquivo no RStudio
-#    2. Clique em "Source" (ou selecione tudo e Ctrl+Enter)
-#    3. Espere terminar. Pode demorar alguns minutos (o 'arrow' e grande).
+#  O download e feito em PYTHON (conector oficial 'delta-sharing'),
+#  porque as tabelas usam Deletion Vectors, que o conector R nao le.
+#  O R serve para: disparar o Python e explorar os CSVs baixados.
 #
-#  Windows: normalmente NAO precisa de Rtools, pois os pacotes vem
-#  como binarios prontos do CRAN. Se em algum momento aparecer um erro
-#  pedindo para compilar, instale o Rtools:
-#    https://cran.r-project.org/bin/windows/Rtools/
+#  Este script:
+#    1. Instala os pacotes R necessarios
+#    2. Instala as dependencias Python (pip install -r requirements.txt)
+#
+#  Como usar: abra no RStudio e clique em "Source".
+#  Pre-requisito: ter o Python instalado (com "Add Python to PATH").
 # =====================================================================
 
-# Usar o CRAN oficial (binarios prontos para Windows)
+# Posiciona o R na pasta deste script (no RStudio)
+if (requireNamespace("rstudioapi", quietly = TRUE) && rstudioapi::isAvailable()) {
+  try(setwd(dirname(rstudioapi::getActiveDocumentContext()$path)), silent = TRUE)
+}
+
 options(repos = c(CRAN = "https://cloud.r-project.org"))
 
 # ---------------------------------------------------------------------
-# 1) 'remotes' -> necessario para instalar o pacote a partir do GitHub
+# 1) Pacotes R (usados para explorar os CSVs em 'explorar_local.R')
 # ---------------------------------------------------------------------
-if (!requireNamespace("remotes", quietly = TRUE)) {
-  install.packages("remotes")
-}
-
-# ---------------------------------------------------------------------
-# 2) Dependencias (todas do CRAN, instalam como binario no Windows)
-# ---------------------------------------------------------------------
-dependencias <- c(
-  "arrow",     # leitura dos dados baixados (formato parquet)
+pacotes_r <- c(
+  "readr",     # ler/salvar CSV (UTF-8)
   "dplyr",     # manipulacao de dados
-  "jsonlite",  # leitura do config.share
-  "httr2",     # requisicoes HTTP para o servidor Delta Sharing
-  "magrittr",  # operador %>%
-  "progress",  # barra de progresso do download
-  "purrr",     # utilitarios
-  "tibble",    # data.frames "arrumados"
-  "readr",     # salvar/ler CSV (UTF-8)
-  "rstudioapi" # descobrir a pasta do projeto automaticamente (ja vem no RStudio)
+  "rstudioapi" # achar a pasta do projeto (ja vem no RStudio)
 )
 
-for (pkg in dependencias) {
+for (pkg in pacotes_r) {
   if (!requireNamespace(pkg, quietly = TRUE)) {
-    message("Instalando: ", pkg)
+    message("Instalando pacote R: ", pkg)
     install.packages(pkg)
   } else {
-    message("Ja instalado: ", pkg)
+    message("Pacote R ja instalado: ", pkg)
   }
 }
 
 # ---------------------------------------------------------------------
-# 3) Pacote 'delta.sharing' (cliente Delta Sharing para R)
-#    Fonte: https://github.com/zacdav-db/delta-sharing-r
+# 2) Dependencias Python (pip install -r requirements.txt)
 # ---------------------------------------------------------------------
-message("Instalando o pacote 'delta.sharing' a partir do GitHub...")
-remotes::install_github("zacdav-db/delta-sharing-r", upgrade = "never")
-
-# ---------------------------------------------------------------------
-# 4) Verificacao final
-# ---------------------------------------------------------------------
-ok <- requireNamespace("delta.sharing", quietly = TRUE)
-if (ok) {
-  message("\n==============================================")
-  message(" OK! Instalacao concluida com sucesso.")
-  message(" Proximo passo: abra e rode 'baixar_dados.R'.")
-  message("==============================================")
-} else {
-  message("\n[ATENCAO] O pacote 'delta.sharing' nao foi encontrado apos a ",
-          "instalacao. Reveja as mensagens de erro acima.")
+encontrar_python <- function() {
+  candidatos <- list(
+    list(cmd = "python",  args = character(0)),
+    list(cmd = "py",      args = "-3"),
+    list(cmd = "python3", args = character(0))
+  )
+  for (c in candidatos) {
+    versao <- tryCatch(
+      system2(c$cmd, c(c$args, "--version"), stdout = TRUE, stderr = TRUE),
+      error = function(e) NULL, warning = function(w) NULL
+    )
+    if (!is.null(versao) && length(versao) > 0 && any(grepl("Python", versao))) {
+      c$versao <- versao[1]
+      return(c)
+    }
+  }
+  NULL
 }
+
+py <- encontrar_python()
+
+if (is.null(py)) {
+  message("\n[ATENCAO] Python nao encontrado no PATH.")
+  message("Instale o Python (https://www.python.org/downloads/) marcando")
+  message("'Add Python to PATH' e rode este script de novo.")
+  message("Ou instale manualmente no terminal:  pip install -r requirements.txt")
+} else {
+  message("\nPython encontrado: ", py$versao)
+  message("Instalando dependencias Python (pip install -r requirements.txt)...")
+  status <- system2(
+    py$cmd,
+    c(py$args, "-m", "pip", "install", "-r", "requirements.txt"),
+    stdout = "", stderr = ""
+  )
+  if (!identical(as.integer(status), 0L)) {
+    message("\n[ATENCAO] O pip terminou com codigo ", status,
+            ". Veja as mensagens acima.")
+  }
+}
+
+message("\n==============================================")
+message(" Setup concluido.")
+message(" Proximo passo: coloque o 'config.share' na pasta")
+message(" e rode 'baixar_dados.R'.")
+message("==============================================")

@@ -1,0 +1,8 @@
+# Dependencias Python do conector Delta Sharing.
+# Instalar com:  pip install -r requirements.txt
+#
+# delta-sharing >= 1.1 e necessario para ler tabelas com Deletion Vectors
+# (formato "delta"), que o conector R nao suporta.
+delta-sharing>=1.1
+pandas>=1.5
+pyarrow>=12.0

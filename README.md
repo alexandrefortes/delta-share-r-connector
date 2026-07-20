@@ -1,15 +1,28 @@
-# Conector Delta Sharing (Databricks Open Share) para R / RStudio
+# Conector Delta Sharing (Databricks Open Share)
 
 Conecta no **Delta Sharing** do Databricks, baixa as tabelas compartilhadas
-e salva em **CSV** para trabalhar **offline** no RStudio. Tudo em R — não
-precisa de Python.
+em **CSV** e permite explorá-las **offline** no RStudio.
+
+## Por que Python + R?
+
+As tabelas compartilhadas usam um recurso do Delta Lake chamado
+**Deletion Vectors**. O conector **R** (`delta.sharing`) só lê o formato
+antigo (parquet puro) e **não** consegue ler essas tabelas — o servidor
+devolve `HTTP 400 (DS_UNSUPPORTED_DELTA_TABLE_FEATURES)`.
+
+Por isso o **download** é feito pelo conector **Python oficial**
+(`delta-sharing`), que suporta Deletion Vectors. O **R** continua no
+comando: um script R (`baixar_dados.R`) dispara o Python e mostra tudo no
+console do RStudio, e depois você explora os CSVs em R (`explorar_local.R`).
 
 ## Arquivos
 
 | Arquivo | Para que serve |
 |---|---|
-| `install_pacotes.R` | Instala tudo que é necessário. **Roda uma vez só.** |
-| `baixar_dados.R` | Conecta e baixa **todas** as tabelas compartilhadas em CSV. |
+| `install_pacotes.R` | Instala os pacotes R **e** as dependências Python. **Roda uma vez.** |
+| `baixar_dados.R` | Script R que executa o downloader Python e baixa **todas** as tabelas. |
+| `baixar_dados.py` | O downloader em si (Python). Chamado pelo `baixar_dados.R`. |
+| `requirements.txt` | Dependências Python (`delta-sharing`, `pandas`, `pyarrow`). |
 | `explorar_local.R` | Abre os CSVs já baixados para explorar **sem internet**. |
 | `config.share.exemplo` | Modelo do arquivo de credenciais. |
 | `config.share` | **Você cria este** com as suas credenciais (veja abaixo). |
@@ -17,54 +30,61 @@ precisa de Python.
 
 ## Passo a passo (Windows + RStudio)
 
-### 1. Instalar o R e o RStudio (se ainda não tiver)
+### 1. Ter o R, o RStudio e o Python instalados
 - R: https://cran.r-project.org/bin/windows/base/
 - RStudio: https://posit.co/download/rstudio-desktop/
+- Python: https://www.python.org/downloads/ — **marque "Add Python to PATH"**
+  durante a instalação.
 
-### 2. Colocar o arquivo de credenciais
-Coloque o seu arquivo `config.share` **nesta pasta**, ao lado dos scripts.
-O conteúdo tem este formato (é o que o Databricks fornece):
+### 2. Instalar as dependências (uma vez só)
+Abra `install_pacotes.R` no RStudio e clique em **Source**. Ele instala os
+pacotes R e roda o `pip install -r requirements.txt` automaticamente.
+
+### 3. Colocar o arquivo de credenciais
+Coloque o seu `config.share` **nesta pasta**, ao lado dos scripts. Formato:
 
 ```json
 {"shareCredentialsVersion":1,"bearerToken":"...","endpoint":"https://...","expirationTime":"9999-12-31T23:59:59.999Z","icebergEndpoint":"https://..."}
 ```
 
-> O cliente usa o campo **`endpoint`** (protocolo Delta Sharing) e o
-> **`bearerToken`**. O campo `icebergEndpoint` **não é usado** por este
-> conector — pode deixar como está.
-
-### 3. Instalar os pacotes (uma vez só)
-Abra `install_pacotes.R` no RStudio e clique em **Source**.
-Pode demorar alguns minutos (o pacote `arrow` é grande).
+> O conector usa o campo **`endpoint`** e o **`bearerToken`**. O campo
+> `icebergEndpoint` **não é usado** — pode deixar como está.
 
 ### 4. Baixar todas as tabelas
-Abra `baixar_dados.R` e clique em **Source**. Ele conecta, descobre
-**sozinho** todas as tabelas compartilhadas e baixa cada uma para a pasta
-`dados/` (um CSV por tabela, no formato `share__schema__tabela.csv`).
+Abra `baixar_dados.R` e clique em **Source**. Ele encontra o Python,
+executa o download e salva um CSV por tabela em `dados/`
+(`share__schema__tabela.csv`). O progresso aparece no console do RStudio.
 
-O console mostra a lista de tabelas encontradas e o progresso de cada
-download. Se alguma falhar, ele avisa e continua nas demais.
+> Dica: para testar antes de baixar tudo, edite `LIMITE_LINHAS = 1000` no
+> topo do `baixar_dados.py` — assim ele baixa só as primeiras 1000 linhas
+> de cada tabela.
 
-> Dica: para testar antes de baixar tudo, defina `LIMITE_LINHAS <- 1000`
-> no topo do script — assim ele baixa só as primeiras 1000 linhas de cada
-> tabela.
-
-### 6. Trabalhar offline
+### 5. Trabalhar offline
 Abra `explorar_local.R` e clique em **Source**. Ele lê os CSVs da pasta
 `dados/` — não precisa de internet nem do `config.share`.
 
+## Rodar sem RStudio (opcional)
+
+O download também funciona direto pelo Python, no terminal:
+
+```bash
+pip install -r requirements.txt
+python baixar_dados.py
+```
+
 ## Problemas comuns
 
-- **"Nao encontrei o arquivo 'config.share'"** → o arquivo não está na
-  pasta certa, ou o RStudio não está apontando para ela. Use no menu:
-  *Session > Set Working Directory > To Source File Location*.
-- **Erro pedindo para compilar / instalar Rtools** → instale o Rtools:
-  https://cran.r-project.org/bin/windows/Rtools/ e rode
-  `install_pacotes.R` de novo.
+- **"Python nao encontrado no PATH"** → instale o Python marcando
+  *Add Python to PATH*, ou reinstale com essa opção, e rode de novo.
+- **"O pacote 'delta-sharing' nao esta instalado"** → rode
+  `install_pacotes.R`, ou no terminal: `pip install -r requirements.txt`.
+- **`HTTP 400 ... DS_UNSUPPORTED_DELTA_TABLE_FEATURES`** → isso acontece no
+  conector **R**. Use o fluxo em Python descrito aqui (é justamente o que
+  ele resolve).
 - **Erro de autenticação / token** → o `bearerToken` pode ter expirado.
   Peça um `config.share` novo a quem compartilhou os dados.
 
 ## Referências
 
-- Pacote R `delta.sharing`: https://github.com/zacdav-db/delta-sharing-r
-- Projeto Delta Sharing (delta-io): https://github.com/delta-io/delta-sharing
+- Conector Python `delta-sharing` (delta-io): https://github.com/delta-io/delta-sharing
+- Deletion Vectors (Delta Lake): https://docs.databricks.com/aws/en/delta/deletion-vectors

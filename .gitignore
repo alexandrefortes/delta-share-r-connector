@@ -10,3 +10,10 @@ dados/
 .Rproj.user/
 *.Rproj
 .Ruserdata
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+env/
